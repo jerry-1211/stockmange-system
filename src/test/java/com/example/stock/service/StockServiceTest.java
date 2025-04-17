@@ -8,7 +8,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-;import static org.junit.jupiter.api.Assertions.*;
+;import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class StockServiceTest {
@@ -37,4 +41,54 @@ class StockServiceTest {
         assertEquals(stock.getQuantity(),99);
     }
 
+    @Test
+    public void 동시에_100개의_요청() throws InterruptedException {
+        int threadCount = 100;
+        ExecutorService executorService = Executors.newFixedThreadPool(32);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            executorService.submit(() -> {
+                try {
+                    stockService.decrease(1L, 1L);
+                } finally {
+                    latch.countDown();
+                }
+
+            });
+        }
+
+        latch.await();
+
+        Stock stock = stockRepository.findById(1L).orElseThrow();
+
+        // Race Condition 발생
+        assertNotEquals(0,stock.getQuantity());
+    }
+
+
+    @Test
+    public void 동시에_100개의_요청_V1() throws InterruptedException {
+        int threadCount = 100;
+        ExecutorService executorService = Executors.newFixedThreadPool(32);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            executorService.submit(() -> {
+                try {
+                    stockService.decrease_V1(1L, 1L);
+                } finally {
+                    latch.countDown();
+                }
+
+            });
+        }
+
+        latch.await();
+
+        Stock stock = stockRepository.findById(1L).orElseThrow();
+
+        // 문제점 : Synchronized는 JVM 안에서만 유효
+        assertNotEquals(0,stock.getQuantity());
+    }
 }
