@@ -1,6 +1,7 @@
 package com.example.stock.service;
 
 import com.example.stock.domain.Stock;
+import com.example.stock.facade.OptimisticLockStockFacade;
 import com.example.stock.repository.StockRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -22,6 +23,9 @@ class StockServiceTest {
 
     @Autowired
     private PessimisticLockStockService pessimisticLockStockService;
+
+    @Autowired
+    private OptimisticLockStockFacade optimisticLockStockFacade;
 
     @Autowired
     private StockRepository stockRepository;
@@ -95,6 +99,7 @@ class StockServiceTest {
         assertNotEquals(0,stock.getQuantity());
     }
 
+    // Pessimistic Lock
     @Test
     public void 동시에_100개의_요청_V2() throws InterruptedException {
         int threadCount = 100;
@@ -116,7 +121,36 @@ class StockServiceTest {
 
         Stock stock = stockRepository.findById(1L).orElseThrow();
 
+        assertEquals(0,stock.getQuantity());
+    }
+
+
+    // Optimisitic Lock
+    @Test
+    public void 동시에_100개의_요청_V3() throws InterruptedException {
+        int threadCount = 100;
+        ExecutorService executorService = Executors.newFixedThreadPool(32);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            executorService.submit(() -> {
+                try {
+                    optimisticLockStockFacade.decrease(1L, 1L);
+                } catch (InterruptedException e){
+                    throw new RuntimeException(e);
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        latch.await();
+
+        Stock stock = stockRepository.findById(1L).orElseThrow();
+
         // Pessimisitic Lock
         assertEquals(0,stock.getQuantity());
     }
+
+
 }
