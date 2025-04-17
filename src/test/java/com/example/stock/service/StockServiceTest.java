@@ -21,6 +21,9 @@ class StockServiceTest {
     private StockService stockService;
 
     @Autowired
+    private PessimisticLockStockService pessimisticLockStockService;
+
+    @Autowired
     private StockRepository stockRepository;
 
     @BeforeEach
@@ -90,5 +93,30 @@ class StockServiceTest {
 
         // 문제점 : Synchronized는 JVM 안에서만 유효
         assertNotEquals(0,stock.getQuantity());
+    }
+
+    @Test
+    public void 동시에_100개의_요청_V2() throws InterruptedException {
+        int threadCount = 100;
+        ExecutorService executorService = Executors.newFixedThreadPool(32);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            executorService.submit(() -> {
+                try {
+                    pessimisticLockStockService.decrease(1L, 1L);
+                } finally {
+                    latch.countDown();
+                }
+
+            });
+        }
+
+        latch.await();
+
+        Stock stock = stockRepository.findById(1L).orElseThrow();
+
+        // Pessimisitic Lock
+        assertEquals(0,stock.getQuantity());
     }
 }
