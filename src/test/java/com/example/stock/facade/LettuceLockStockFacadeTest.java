@@ -37,8 +37,6 @@ class LettuceLockStockFacadeTest {
         stockRepository.deleteAll();
     }
 
-
-    // Optimisitic Lock
     @Test
     public void 동시에_100개의_요청_V4() throws InterruptedException {
         int threadCount = 100;
